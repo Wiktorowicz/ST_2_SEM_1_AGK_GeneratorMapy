@@ -3,20 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{3BC81751-33EE-79CC-8054-9527126E2A1C}|Assembly-CSharp.csproj|c:\\users\\lukas\\videos\\2403\\agk-generowaniev4\\assets\\terrainsplatgraph.shader||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{3BC81751-33EE-79CC-8054-9527126E2A1C}|Assembly-CSharp.csproj|solutionrelative:assets\\terrainsplatgraph.shader||{3B902123-F8A7-4915-9F01-361F908088D0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainSmoothBlend.shader||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\TerrainSmoothBlend.shader||{3B902123-F8A7-4915-9F01-361F908088D0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainUnit.shader||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\TerrainUnit.shader||{3B902123-F8A7-4915-9F01-361F908088D0}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{3BC81751-33EE-79CC-8054-9527126E2A1C}|Assembly-CSharp.csproj|C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\assets\\proceduralterrain.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3BC81751-33EE-79CC-8054-9527126E2A1C}|Assembly-CSharp.csproj|solutionrelative:assets\\proceduralterrain.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3BC81751-33EE-79CC-8054-9527126E2A1C}|Assembly-CSharp.csproj|c:\\users\\lukas\\videos\\2403\\agk-generowaniev4\\assets\\terrainurp.shader||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{3BC81751-33EE-79CC-8054-9527126E2A1C}|Assembly-CSharp.csproj|solutionrelative:assets\\terrainurp.shader||{3B902123-F8A7-4915-9F01-361F908088D0}"
     }
   ],
   "DocumentGroupContainers": [
@@ -26,59 +18,33 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "TerrainSplatGraph.shader",
-              "DocumentMoniker": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainSplatGraph.shader",
-              "RelativeDocumentMoniker": "Assets\\TerrainSplatGraph.shader",
-              "ToolTip": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainSplatGraph.shader",
-              "RelativeToolTip": "Assets\\TerrainSplatGraph.shader",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 1,
+              "Title": "TerrainURP.shader",
+              "DocumentMoniker": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainURP.shader",
+              "RelativeDocumentMoniker": "Assets\\TerrainURP.shader",
+              "ToolTip": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainURP.shader",
+              "RelativeToolTip": "Assets\\TerrainURP.shader",
+              "ViewState": "AgIAACwAAAAAAAAAAAAqwEwAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002777|",
-              "WhenOpened": "2026-03-24T13:56:20.158Z",
+              "WhenOpened": "2026-03-24T13:56:53.639Z",
               "EditorCaption": ""
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
-            },
-            {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "TerrainSmoothBlend.shader",
-              "DocumentMoniker": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainSmoothBlend.shader",
-              "RelativeDocumentMoniker": "Assets\\TerrainSmoothBlend.shader",
-              "ToolTip": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainSmoothBlend.shader",
-              "RelativeToolTip": "Assets\\TerrainSmoothBlend.shader",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002777|",
-              "WhenOpened": "2026-03-24T13:50:23.792Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "TerrainUnit.shader",
-              "DocumentMoniker": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainUnit.shader",
-              "RelativeDocumentMoniker": "Assets\\TerrainUnit.shader",
-              "ToolTip": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\TerrainUnit.shader",
-              "RelativeToolTip": "Assets\\TerrainUnit.shader",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAAFAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002777|",
-              "WhenOpened": "2026-03-24T13:47:27.241Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 0,
               "Title": "ProceduralTerrain.cs",
               "DocumentMoniker": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\ProceduralTerrain.cs",
               "RelativeDocumentMoniker": "Assets\\ProceduralTerrain.cs",
               "ToolTip": "C:\\Users\\lukas\\Videos\\2403\\AGK-GenerowanieV4\\Assets\\ProceduralTerrain.cs",
               "RelativeToolTip": "Assets\\ProceduralTerrain.cs",
-              "ViewState": "AgIAACsAAAAAAAAAAAAIwEwAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAGUAAAAAAAAAAAAIwHAAAABJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-22T19:00:25.466Z"
+              "WhenOpened": "2026-03-22T19:00:25.466Z",
+              "EditorCaption": ""
             }
           ]
         }

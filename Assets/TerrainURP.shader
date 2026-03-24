@@ -1,4 +1,4 @@
-﻿Shader "Custom/TerrainURP_4Textures_Fixed"
+﻿Shader "Custom/Terrain_Triplanar_Final"
 {
     Properties
     {
@@ -7,6 +7,7 @@
         _RockTex("Rock", 2D) = "white" {}
         _SnowTex("Snow", 2D) = "white" {}
         _Tiling("Tiling", Float) = 0.05
+        _Blend("Triplanar Blend", Range(1, 50)) = 10.0
     }
 
     SubShader
@@ -18,58 +19,55 @@
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct appdata
-            {
+            struct appdata {
                 float4 vertex : POSITION;
+                float3 normal : NORMAL;
                 float4 color : COLOR;
             };
 
-            struct v2f
-            {
+            struct v2f {
                 float4 positionCS : SV_POSITION;
                 float4 color : TEXCOORD0;
-                float2 uv : TEXCOORD1;
+                float3 positionWS : TEXCOORD1;
+                float3 normalWS : TEXCOORD3;
             };
 
-            sampler2D _SandTex;
-            sampler2D _GrassTex;
-            sampler2D _RockTex;
-            sampler2D _SnowTex;
+            sampler2D _SandTex, _GrassTex, _RockTex, _SnowTex;
+            float _Tiling, _Blend;
 
-            float _Tiling;
-
-            v2f vert(appdata v)
-            {
+            v2f vert(appdata v) {
                 v2f o;
                 o.positionCS = TransformObjectToHClip(v.vertex.xyz);
-                o.uv = v.vertex.xz * _Tiling;
+                o.positionWS = TransformObjectToWorld(v.vertex.xyz);
+                o.normalWS = TransformObjectToWorldNormal(v.normal);
                 o.color = v.color;
                 return o;
             }
 
-            half4 frag(v2f i) : SV_Target
-            {
-                half4 weights = saturate(i.color);
+            half4 TriSample(sampler2D t, float3 p, float3 n, float til) {
+                float3 b = pow(abs(n), _Blend);
+                b /= (b.x + b.y + b.z);
+                return tex2D(t, p.zy * til) * b.x + tex2D(t, p.xz * til) * b.y + tex2D(t, p.xy * til) * b.z;
+            }
 
-                // 🔥 zabezpieczenie
-                half sum = weights.r + weights.g + weights.b + weights.a + 0.0001;
-                weights /= sum;
+            half4 frag(v2f i) : SV_Target {
+                float3 n = normalize(i.normalWS);
+                
+                half4 s = TriSample(_SandTex, i.positionWS, n, _Tiling);
+                half4 g = TriSample(_GrassTex, i.positionWS, n, _Tiling);
+                half4 r = TriSample(_RockTex, i.positionWS, n, _Tiling);
+                half4 sn = TriSample(_SnowTex, i.positionWS, n, _Tiling);
 
-                half4 sand = tex2D(_SandTex, i.uv);
-                half4 grass = tex2D(_GrassTex, i.uv);
-                half4 rock = tex2D(_RockTex, i.uv);
-                half4 snow = tex2D(_SnowTex, i.uv);
+                half4 finalColor = s * i.color.r + g * i.color.g + r * i.color.b + sn * i.color.a;
 
-                half4 finalColor =
-                    sand * weights.r +
-                    grass * weights.g +
-                    rock * weights.b +
-                    snow * weights.a;
+                Light l = GetMainLight();
+                float diff = saturate(dot(n, l.direction)) * l.shadowAttenuation;
+                float3 lighting = l.color * (diff + 0.35);
 
-                return half4(finalColor.rgb, 1.0);
+                return half4(finalColor.rgb * lighting, 1.0);
             }
             ENDHLSL
         }

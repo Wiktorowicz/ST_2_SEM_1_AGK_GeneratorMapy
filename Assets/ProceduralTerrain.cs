@@ -3,130 +3,164 @@
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
 public class ProceduralTerrainSmooth : MonoBehaviour
 {
-    public int width = 200;
-    public int depth = 200;
-    public float heightMultiplier = 15f;
-    public float hillFrequency = 0.02f;
+    public int width = 256;
+    public int depth = 256;
 
-    [Header("Tekstury")]
+    private int iterations = 300;
+    private float initialDisplacement = 2.0f;
+    private float elevationExponent = 3.5f;
+    private int smoothIterations = 4;
+
+    [Header("Skalowanie")]
+    public float mnoznikWysokosci = 50f;
+
+    [Header("Tekstury i Woda")]
+    public float waterLevel = 2.0f;
+    public Material terrainMaterial;
+    public Material waterMaterial;
     public Texture2D sandTexture;
     public Texture2D grassTexture;
     public Texture2D rockTexture;
     public Texture2D snowTexture;
-    public float textureScale = 0.05f; // 🔥 lepsze UV
+    public float textureScale = 0.05f;
 
-    [Header("Progi Wysokości")]
-    public float waterLevel = 2.0f;
-    public float grassLevel = 5.0f;
-    public float rockLevel = 9.0f;
+    private float[] heights;
 
-    public Material terrainMaterial;
-    private Material internalMat;
-
-    void Start()
-    {
-        if (terrainMaterial != null)
-        {
-            internalMat = new Material(terrainMaterial);
-            GetComponent<MeshRenderer>().material = internalMat;
-        }
-
-        GenerateTerrain();
-        ApplyTextures();
-    }
+    void Start() => GenerateTerrain();
 
     void GenerateTerrain()
     {
-        Mesh mesh = new Mesh();
-        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        heights = new float[width * depth];
+        float currentDisplacement = initialDisplacement;
 
+        for (int i = 0; i < iterations; i++)
+        {
+            float lineX = Random.Range(0, width);
+            float lineZ = Random.Range(0, depth);
+            Vector2 lineDir = new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized;
+
+            for (int z = 0; z < depth; z++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int idx = z * width + x;
+                    Vector2 pos = new Vector2(x - lineX, z - lineZ);
+                    if (Vector2.Dot(pos, lineDir) > 0) heights[idx] += currentDisplacement;
+                    else heights[idx] -= currentDisplacement;
+                }
+            }
+            currentDisplacement *= 0.995f;
+        }
+
+        ApplyTerrainShaping();
+
+        for (int s = 0; s < smoothIterations; s++) SmoothHeights();
+
+        Mesh mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
         Vector3[] vertices = new Vector3[width * depth];
         Color[] colors = new Color[vertices.Length];
-        int[] triangles = new int[(width - 1) * (depth - 1) * 6];
 
         for (int z = 0; z < depth; z++)
         {
             for (int x = 0; x < width; x++)
             {
                 int i = z * width + x;
+                float y = heights[i] * mnoznikWysokosci;
 
-                // 🔥 LEPSZY NOISE (2 warstwy)
-                float n1 = Mathf.PerlinNoise(x * hillFrequency, z * hillFrequency);
-                float n2 = Mathf.PerlinNoise(x * hillFrequency * 2f, z * hillFrequency * 2f) * 0.5f;
+                float riverX = (width * 0.5f) + Mathf.Sin(z * 0.05f) * 20f;
+                float distToRiver = Mathf.Abs(x - riverX);
 
-                float noise = n1 + n2;
+                float rzekaPromien = 25f;
 
-                float y = Mathf.Pow(noise, 1.5f) * heightMultiplier;
+                if (distToRiver < rzekaPromien)
+                {
+                    float smoothRiver = Mathf.SmoothStep(rzekaPromien, 0f, distToRiver);
+                    y -= smoothRiver * (waterLevel + 4f);
+                }
 
                 vertices[i] = new Vector3(x, y, z);
-
-                // 🔥 KLUCZOWE – NORMALIZOWANE WAGI
-                colors[i] = CalculateWeights(y);
+                colors[i] = CalculateWeights(y, distToRiver, heights[i]);
             }
         }
 
+        int[] triangles = new int[(width - 1) * (depth - 1) * 6];
         int tri = 0;
         for (int z = 0; z < depth - 1; z++)
-        {
             for (int x = 0; x < width - 1; x++)
             {
                 int s = z * width + x;
-
-                triangles[tri++] = s;
-                triangles[tri++] = s + width;
-                triangles[tri++] = s + 1;
-
-                triangles[tri++] = s + 1;
-                triangles[tri++] = s + width;
-                triangles[tri++] = s + width + 1;
+                triangles[tri++] = s; triangles[tri++] = s + width; triangles[tri++] = s + 1;
+                triangles[tri++] = s + 1; triangles[tri++] = s + width; triangles[tri++] = s + width + 1;
             }
-        }
 
         mesh.vertices = vertices;
         mesh.triangles = triangles;
         mesh.colors = colors;
-
         mesh.RecalculateNormals();
 
         GetComponent<MeshFilter>().mesh = mesh;
         GetComponent<MeshCollider>().sharedMesh = mesh;
+
+        ApplyTexturesToMaterial();
+        CreateWater();
     }
 
-    void ApplyTextures()
+    void ApplyTerrainShaping()
     {
-        if (internalMat == null) return;
-
-        internalMat.SetTexture("_SandTex", sandTexture);
-        internalMat.SetTexture("_GrassTex", grassTexture);
-        internalMat.SetTexture("_RockTex", rockTexture);
-        internalMat.SetTexture("_SnowTex", snowTexture);
-
-        internalMat.SetFloat("_Tiling", textureScale);
+        float minH = float.MaxValue, maxH = float.MinValue;
+        foreach (float h in heights)
+        {
+            if (h < minH) minH = h;
+            if (h > maxH) maxH = h;
+        }
+        for (int i = 0; i < heights.Length; i++)
+        {
+            float normalized = (heights[i] - minH) / (maxH - minH);
+            heights[i] = Mathf.Pow(normalized, elevationExponent);
+        }
     }
 
-    // 🔥 NAJWAŻNIEJSZA FUNKCJA (NAPRAWIONA)
-    Color CalculateWeights(float y)
+    void SmoothHeights()
     {
-        // 🔥 wyraźne zakresy wysokości
-        float sand = Mathf.Clamp01((waterLevel - y) * 2f);
+        float[] nh = new float[heights.Length];
+        for (int z = 1; z < depth - 1; z++)
+            for (int x = 1; x < width - 1; x++)
+                nh[z * width + x] = (heights[(z - 1) * width + x] + heights[(z + 1) * width + x] +
+                                     heights[z * width + x - 1] + heights[z * width + x + 1] + heights[z * width + x]) / 5f;
+        heights = nh;
+    }
 
-        float grass = Mathf.Clamp01(1f - Mathf.Abs(y - grassLevel) / 2f);
-        float rock = Mathf.Clamp01(1f - Mathf.Abs(y - rockLevel) / 2f);
-        float snow = Mathf.Clamp01((y - rockLevel) / 2f);
+    Color CalculateWeights(float y, float distToRiver, float h)
+    {
+        float sand = (y < waterLevel + 1.2f && distToRiver < 18f) ? 1f : 0f;
 
-        // 🔥 bonus: wycinamy słabe wpływy (ważne!)
-        sand = sand < 0.01f ? 0 : sand;
-        grass = grass < 0.01f ? 0 : grass;
-        rock = rock < 0.01f ? 0 : rock;
-        snow = snow < 0.01f ? 0 : snow;
+        float snow = (h > 0.75f) ? Mathf.Clamp01((y - 35f) / 10f) : 0f;
+        float rock = (h > 0.45f) ? Mathf.Clamp01((y - 20f) / 10f) : 0f;
+        float grass = Mathf.Clamp01(1f - (sand + rock + snow));
 
-        float sum = sand + grass + rock + snow + 0.0001f;
+        float sum = sand + grass + rock + snow + 0.001f;
+        return new Color(sand / sum, grass / sum, rock / sum, snow / sum);
+    }
 
-        return new Color(
-            sand / sum,
-            grass / sum,
-            rock / sum,
-            snow / sum
-        );
+    void ApplyTexturesToMaterial()
+    {
+        if (!terrainMaterial) return;
+        terrainMaterial.SetTexture("_SandTex", sandTexture);
+        terrainMaterial.SetTexture("_GrassTex", grassTexture);
+        terrainMaterial.SetTexture("_RockTex", rockTexture);
+        terrainMaterial.SetTexture("_SnowTex", snowTexture);
+        terrainMaterial.SetFloat("_Tiling", textureScale);
+        GetComponent<MeshRenderer>().sharedMaterial = terrainMaterial;
+    }
+
+    void CreateWater()
+    {
+        GameObject old = GameObject.Find("WaterSurface");
+        if (old) DestroyImmediate(old);
+        GameObject water = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        water.name = "WaterSurface";
+        water.transform.position = new Vector3(width / 2f - 0.5f, waterLevel, depth / 2f - 0.5f);
+        water.transform.localScale = new Vector3(width / 10f, 1, depth / 10f);
+        if (waterMaterial) water.GetComponent<MeshRenderer>().material = waterMaterial;
     }
 }

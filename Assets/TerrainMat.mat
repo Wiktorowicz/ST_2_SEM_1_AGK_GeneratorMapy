@@ -41,7 +41,9 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Tiling: 0.1
+    - _Blend: 10
+    - _Tiling: 0.05
+    - _TriplanarBlend: 10
     m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1
