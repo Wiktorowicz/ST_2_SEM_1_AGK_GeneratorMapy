@@ -10,7 +10,8 @@ public class VillageGenerator : MonoBehaviour
     [SerializeField] private float buildingOffset = 6f;
 
     [Header("Village Placement")]
-    [SerializeField] private float minVillageHeightAboveWater = 1.2f;
+    [SerializeField] private float minVillageHeightAboveWater = 2.4f;
+    [SerializeField] private float minRoadHeightAboveWater = 1.8f;
     [SerializeField] private float maxVillageHeight = 18f;
     [SerializeField] private int flatCheckRadius = 12;
     [SerializeField] private float maxHeightDifference = 2.5f;
@@ -22,8 +23,14 @@ public class VillageGenerator : MonoBehaviour
 
     [Header("Road")]
     [SerializeField] private Material roadMaterial;
-    [SerializeField] private float roadWidth = 4f;
-    [SerializeField] private float clearRoadObjectsRadius = 5f;
+    [SerializeField] private float roadWidth = 6f;
+    [SerializeField] private float roadHeightOffset = 0.15f;
+    [SerializeField] private float clearRoadObjectsRadius = 7f;
+
+    [Header("Side Roads")]
+    [SerializeField] private int sideRoadSpacing = 28;
+    [SerializeField] private int minSideRoadLength = 20;
+    [SerializeField] private float sideRoadChance = 0.55f;
 
     private List<Vector3> roadPoints = new List<Vector3>();
     private List<List<Vector3>> allRoads = new List<List<Vector3>>();
@@ -148,6 +155,20 @@ public class VillageGenerator : MonoBehaviour
         return h > terrainGenerator.GetWaterLevel() + 0.2f;
     }
 
+    bool IsGoodRoadHeight(float x, float z)
+    {
+        float h = terrainGenerator.GetHeightWorld(x, z);
+        float water = terrainGenerator.GetWaterLevel();
+
+        if (h < water + minRoadHeightAboveWater)
+            return false;
+
+        if (h > maxVillageHeight)
+            return false;
+
+        return true;
+    }
+
     void GenerateRoad(Vector2Int start)
     {
         roadPoints.Clear();
@@ -164,42 +185,51 @@ public class VillageGenerator : MonoBehaviour
                 z > terrainGenerator.GetDepth() - 5)
                 break;
 
+            if (!IsGoodRoadHeight(x, z))
+                break;
+
             float y = terrainGenerator.GetHeightWorld(x, z);
-            float waterLevel = terrainGenerator.GetWaterLevel();
 
-            if (y <= waterLevel + 0.3f)
-                break;
-
-            if (y > maxVillageHeight)
-                break;
-
-            Vector3 point = new Vector3(x, y + 0.05f, z);
+            Vector3 point = new Vector3(x, y + roadHeightOffset, z);
             roadPoints.Add(point);
 
             x += 2.5f;
             z += Random.Range(-0.3f, 0.3f);
         }
 
-        allRoads.Add(new List<Vector3>(roadPoints));
+        if (roadPoints.Count > 2)
+        {
+            allRoads.Add(new List<Vector3>(roadPoints));
+            CreateRoadMesh(roadPoints);
+        }
 
-        CreateRoadMesh(roadPoints);
+        int lastSideRoadIndex = -999;
 
         for (int i = 0; i < roadPoints.Count - 1; i++)
         {
             Vector3 a = roadPoints[i];
             Vector3 b = roadPoints[i + 1];
 
-            if (i % 8 == 0 && Random.value > 0.5f)
-            {
-                Vector3 dir = (b - a).normalized;
+            if (i - lastSideRoadIndex < sideRoadSpacing)
+                continue;
 
+            if (i % 4 != 0)
+                continue;
+
+            if (Random.value > sideRoadChance)
+                continue;
+
+            Vector3 dir = (b - a).normalized;
+
+            if (GenerateSideRoad(a, dir))
+            {
                 intersections.Add(a);
-                GenerateSideRoad(a, dir);
+                lastSideRoadIndex = i;
             }
         }
     }
 
-    void GenerateSideRoad(Vector3 startPoint, Vector3 mainDir)
+    bool GenerateSideRoad(Vector3 startPoint, Vector3 mainDir)
     {
         List<Vector3> sidePoints = new List<Vector3>();
 
@@ -211,7 +241,7 @@ public class VillageGenerator : MonoBehaviour
         float x = startPoint.x;
         float z = startPoint.z;
 
-        int length = Random.Range(10, 35);
+        int length = Random.Range(minSideRoadLength, minSideRoadLength + 20);
 
         for (int i = 0; i < length; i++)
         {
@@ -220,26 +250,26 @@ public class VillageGenerator : MonoBehaviour
                 z > terrainGenerator.GetDepth() - 5)
                 break;
 
+            if (!IsGoodRoadHeight(x, z))
+                break;
+
             float y = terrainGenerator.GetHeightWorld(x, z);
-            float waterLevel = terrainGenerator.GetWaterLevel();
 
-            if (y <= waterLevel + 0.3f)
-                break;
-
-            if (y > maxVillageHeight)
-                break;
-
-            Vector3 point = new Vector3(x, y + 0.05f, z);
+            Vector3 point = new Vector3(x, y + roadHeightOffset, z);
             sidePoints.Add(point);
 
             x += dir.x * 2.5f;
             z += dir.z * 2.5f;
         }
 
-        if (sidePoints.Count > 2)
+        if (sidePoints.Count >= minSideRoadLength)
+        {
             allRoads.Add(sidePoints);
+            CreateRoadMesh(sidePoints);
+            return true;
+        }
 
-        CreateRoadMesh(sidePoints);
+        return false;
     }
 
     void CreateRoadMesh(List<Vector3> points)
@@ -266,8 +296,8 @@ public class VillageGenerator : MonoBehaviour
             Vector3 left = points[i] + side;
             Vector3 right = points[i] - side;
 
-            left.y = terrainGenerator.GetHeightWorld(left.x, left.z) + 0.1f;
-            right.y = terrainGenerator.GetHeightWorld(right.x, right.z) + 0.1f;
+            left.y = terrainGenerator.GetHeightWorld(left.x, left.z) + roadHeightOffset;
+            right.y = terrainGenerator.GetHeightWorld(right.x, right.z) + roadHeightOffset;
 
             vertices.Add(left);
             vertices.Add(right);
@@ -350,7 +380,7 @@ public class VillageGenerator : MonoBehaviour
         float h = terrainGenerator.GetHeightWorld(pos.x, pos.z);
         float water = terrainGenerator.GetWaterLevel();
 
-        if (h < water + 0.5f)
+        if (h < water + minRoadHeightAboveWater)
             return false;
 
         if (h > maxVillageHeight)
