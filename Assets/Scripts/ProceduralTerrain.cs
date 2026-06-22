@@ -68,6 +68,7 @@ public class ProceduralTerrainSmooth : MonoBehaviour {
         BuildMesh();
         ApplyTexturesToMaterial();
         CreateWater();
+        SaveMaps();
     }
 
     void BuildMesh() {
@@ -222,5 +223,72 @@ public class ProceduralTerrainSmooth : MonoBehaviour {
         int z = Mathf.Clamp(Mathf.RoundToInt(worldZ), 0, depth - 1);
 
         return heights[z * width + x];
+    }
+    public Texture2D GenerateGrayscaleHeightMap()
+    {
+        Texture2D tex = new Texture2D(width, depth);
+
+        for (int z = 0; z < depth; z++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int i = z * width + x;
+
+                float h = Mathf.Clamp01(heights[i]);
+
+                tex.SetPixel(x, z, new Color(h, h, h));
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+    public Texture2D GenerateColoredMap()
+    {
+        Texture2D tex = new Texture2D(width, depth);
+
+        for (int z = 0; z < depth; z++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int i = z * width + x;
+
+                float h = heights[i];
+                float y = h * mnoznikWysokosci;
+
+                Color color;
+
+                if (y <= waterLevel)
+                    color = Color.blue;
+                else if (y < waterLevel + 1.2f)
+                    color = new Color(0.8f, 0.7f, 0.4f);
+                else if (h > 0.75f)
+                    color = Color.white;
+                else if (h > 0.45f)
+                    color = Color.gray;
+                else
+                    color = Color.green;
+
+                tex.SetPixel(x, z, color);
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+    public void SaveMaps()
+    {
+        Texture2D gray = GenerateGrayscaleHeightMap();
+        Texture2D color = GenerateColoredMap();
+
+        System.IO.File.WriteAllBytes(
+            Application.dataPath + "/HeightMap_Gray.png",
+            gray.EncodeToPNG());
+
+        System.IO.File.WriteAllBytes(
+            Application.dataPath + "/HeightMap_Color.png",
+            color.EncodeToPNG());
+
+        Debug.Log("Mapy zapisane.");
     }
 }
