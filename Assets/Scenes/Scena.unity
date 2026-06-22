@@ -276,10 +276,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VillageGenerator
   terrainGenerator: {fileID: 1871622654}
-  villageSize: 0
+  minVillageSize: 100
+  maxVillageSize: 220
   buildingOffset: 12
+  minVillageCount: 2
+  maxVillageCount: 5
+  minVillageHeightAboveWater: 2
+  minRoadHeightAboveWater: 1.8
+  maxVillageHeight: 18
+  flatCheckRadius: 12
+  maxHeightDifference: 2.5
+  minDistanceBetweenVillages: 180
+  minDistanceFromOtherVillageRoads: 90
+  houseBlockRadius: 8
+  minDistanceFromRoad: 5
+  clearTreesRadius: 6
   roadMaterial: {fileID: 2100000, guid: 416d84a56c2fdc8448f1b4894ba0b53e, type: 2}
   roadWidth: 4
+  roadHeightOffset: 1
+  clearRoadObjectsRadius: 5
+  sideRoadSpacing: 28
+  minSideRoadLength: 20
+  sideRoadChance: 0.55
 --- !u!4 &775052819
 Transform:
   m_ObjectHideFlags: 0

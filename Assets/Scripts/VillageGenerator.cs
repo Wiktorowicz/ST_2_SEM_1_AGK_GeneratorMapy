@@ -36,12 +36,21 @@ public class VillageGenerator : MonoBehaviour
     [SerializeField] private Material roadMaterial;
     [SerializeField] private float roadWidth = 14f;
     [SerializeField] private float roadHeightOffset = 0.6f;
-    [SerializeField] private float clearRoadObjectsRadius = 10f;
+    [SerializeField] private float clearRoadObjectsRadius = 16f;
 
     [Header("Side Roads")]
     [SerializeField] private int sideRoadSpacing = 45;
     [SerializeField] private int minSideRoadLength = 20;
     [SerializeField] private float sideRoadChance = 0.45f;
+
+    [Header("Village Connections")]
+    /*[SerializeField]*/ private bool connectVillages = true;
+    /*[SerializeField]*/ private float maxVillageConnectionDistance = 700f;
+    /*[SerializeField]*/ private float connectionRoadStep = 4f;
+    /*[SerializeField]*/ private float connectionMinHeightAboveWater = 1.0f;
+    /*[SerializeField]*/ private float connectionMaxHeight = 24f;
+    /*[SerializeField]*/ private float connectionSlopeLimit = 3.5f;
+    /*[SerializeField]*/ private int maxPathSearchIterations = 20000;
 
     private List<Vector3> roadPoints = new List<Vector3>();
     private List<List<Vector3>> allRoads = new List<List<Vector3>>();
@@ -96,11 +105,23 @@ public class VillageGenerator : MonoBehaviour
         if (possibleHouses < 6)
             return false;
 
+        List<Vector3> connectionRoad = null;
+
+        if (connectVillages)
+            connectionRoad = TryCreateConnectionRoad();
+
         villageCenters.Add(startPoint);
 
         terrainGenerator.FlattenArea(startPoint.x, startPoint.y, 35);
 
         CreateAllRoadMeshes();
+
+        if (connectionRoad != null && connectionRoad.Count > 2)
+        {
+            CreateRoadMesh(connectionRoad);
+            globalRoads.Add(new List<Vector3>(connectionRoad));
+        }
+
         GenerateBuildings();
         GenerateDecorations();
 
@@ -108,6 +129,257 @@ public class VillageGenerator : MonoBehaviour
             globalRoads.Add(new List<Vector3>(road));
 
         return true;
+    }
+
+    List<Vector3> TryCreateConnectionRoad()
+    {
+        if (globalRoads.Count == 0 || roadPoints.Count < 2)
+            return null;
+
+        Vector3 newA = roadPoints[0];
+        Vector3 newB = roadPoints[roadPoints.Count - 1];
+
+        Vector3 bestStart = Vector3.zero;
+        Vector3 bestTarget = Vector3.zero;
+
+        float bestDistance = float.MaxValue;
+        bool found = false;
+
+        foreach (var oldRoad in globalRoads)
+        {
+            if (oldRoad.Count < 2)
+                continue;
+
+            Vector3 oldA = oldRoad[0];
+            Vector3 oldB = oldRoad[oldRoad.Count - 1];
+
+            CheckConnectionPair(newA, oldA, ref bestStart, ref bestTarget, ref bestDistance, ref found);
+            CheckConnectionPair(newA, oldB, ref bestStart, ref bestTarget, ref bestDistance, ref found);
+            CheckConnectionPair(newB, oldA, ref bestStart, ref bestTarget, ref bestDistance, ref found);
+            CheckConnectionPair(newB, oldB, ref bestStart, ref bestTarget, ref bestDistance, ref found);
+        }
+
+        if (!found)
+            return null;
+
+        if (bestDistance > maxVillageConnectionDistance)
+            return null;
+
+        return FindConnectionPath(bestStart, bestTarget);
+    }
+    void CheckConnectionPair(
+    Vector3 a,
+    Vector3 b,
+    ref Vector3 bestStart,
+    ref Vector3 bestTarget,
+    ref float bestDistance,
+    ref bool found)
+    {
+        float dist = Vector2.Distance(
+            new Vector2(a.x, a.z),
+            new Vector2(b.x, b.z)
+        );
+
+        if (dist < bestDistance)
+        {
+            bestDistance = dist;
+            bestStart = a;
+            bestTarget = b;
+            found = true;
+        }
+    }
+
+    List<Vector3> FindConnectionPath(Vector3 startWorld, Vector3 endWorld)
+    {
+        Vector2Int start = WorldToConnectionCell(startWorld);
+        Vector2Int end = WorldToConnectionCell(endWorld);
+
+        List<Vector2Int> open = new List<Vector2Int>();
+        HashSet<Vector2Int> closed = new HashSet<Vector2Int>();
+
+        Dictionary<Vector2Int, Vector2Int> cameFrom = new Dictionary<Vector2Int, Vector2Int>();
+        Dictionary<Vector2Int, float> gCost = new Dictionary<Vector2Int, float>();
+
+        open.Add(start);
+        gCost[start] = 0f;
+
+        Vector2Int[] dirs =
+        {
+            new Vector2Int(1, 0),
+            new Vector2Int(-1, 0),
+            new Vector2Int(0, 1),
+            new Vector2Int(0, -1)
+        };
+
+        int iterations = 0;
+
+        while (open.Count > 0 && iterations < maxPathSearchIterations)
+        {
+            iterations++;
+
+            Vector2Int current = GetLowestCostCell(open, gCost, end);
+
+            if (Vector2Int.Distance(current, end) <= 1f)
+                return BuildWorldPath(cameFrom, current);
+
+            open.Remove(current);
+            closed.Add(current);
+
+            foreach (Vector2Int dir in dirs)
+            {
+                Vector2Int next = current + dir;
+
+                if (closed.Contains(next))
+                    continue;
+
+                if (!IsValidConnectionCell(next))
+                    continue;
+
+                float moveCost = GetConnectionCellCost(current, next);
+
+                if (moveCost >= 99999f)
+                    continue;
+
+                float newCost = gCost[current] + moveCost;
+
+                if (!gCost.ContainsKey(next) || newCost < gCost[next])
+                {
+                    gCost[next] = newCost;
+                    cameFrom[next] = current;
+
+                    if (!open.Contains(next))
+                        open.Add(next);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    Vector2Int WorldToConnectionCell(Vector3 pos)
+    {
+        int x = Mathf.RoundToInt(pos.x / connectionRoadStep);
+        int z = Mathf.RoundToInt(pos.z / connectionRoadStep);
+
+        return new Vector2Int(x, z);
+    }
+
+    Vector3 ConnectionCellToWorld(Vector2Int cell)
+    {
+        float x = cell.x * connectionRoadStep;
+        float z = cell.y * connectionRoadStep;
+        float y = terrainGenerator.GetHeightWorld(x, z);
+
+        return new Vector3(x, y + roadHeightOffset, z);
+    }
+
+    Vector2Int GetLowestCostCell(List<Vector2Int> open, Dictionary<Vector2Int, float> gCost, Vector2Int end)
+    {
+        Vector2Int best = open[0];
+        float bestCost = float.MaxValue;
+
+        foreach (Vector2Int cell in open)
+        {
+            float g = gCost.ContainsKey(cell) ? gCost[cell] : 99999f;
+            float h = Vector2Int.Distance(cell, end);
+            float total = g + h;
+
+            if (total < bestCost)
+            {
+                bestCost = total;
+                best = cell;
+            }
+        }
+
+        return best;
+    }
+
+    List<Vector3> BuildWorldPath(Dictionary<Vector2Int, Vector2Int> cameFrom, Vector2Int current)
+    {
+        List<Vector3> path = new List<Vector3>();
+
+        while (cameFrom.ContainsKey(current))
+        {
+            path.Add(ConnectionCellToWorld(current));
+            current = cameFrom[current];
+        }
+
+        path.Add(ConnectionCellToWorld(current));
+        path.Reverse();
+
+        if (path.Count < 3)
+            return null;
+
+        return path;
+    }
+
+    bool IsValidConnectionCell(Vector2Int cell)
+    {
+        float x = cell.x * connectionRoadStep;
+        float z = cell.y * connectionRoadStep;
+
+        if (x < 10 || z < 10 ||
+            x >= terrainGenerator.GetWidth() - 10 ||
+            z >= terrainGenerator.GetDepth() - 10)
+            return false;
+
+        float h = terrainGenerator.GetHeightWorld(x, z);
+        float water = terrainGenerator.GetWaterLevel();
+
+        if (h < water + connectionMinHeightAboveWater)
+            return false;
+
+        if (h > connectionMaxHeight)
+            return false;
+
+        return true;
+    }
+
+    float GetConnectionCellCost(Vector2Int from, Vector2Int to)
+    {
+        Vector3 a = ConnectionCellToWorld(from);
+        Vector3 b = ConnectionCellToWorld(to);
+
+        float heightDiff = Mathf.Abs(a.y - b.y);
+
+        if (heightDiff > connectionSlopeLimit)
+            return 99999f;
+
+        float cost = 1f;
+
+        cost += heightDiff * 4f;
+
+        float h = terrainGenerator.GetHeightWorld(b.x, b.z);
+        float water = terrainGenerator.GetWaterLevel();
+
+        if (h < water + 3f)
+            cost += 10f;
+
+        if (h > maxVillageHeight)
+            cost += 8f;
+
+        if (IsNearExistingRoadOnly(b, roadWidth * 0.5f))
+            cost -= 0.4f;
+
+        return Mathf.Max(0.1f, cost);
+    }
+
+    bool IsNearExistingRoadOnly(Vector3 pos, float radius)
+    {
+        foreach (var road in globalRoads)
+        {
+            for (int i = 0; i < road.Count - 1; i++)
+            {
+                Vector2 p = new Vector2(pos.x, pos.z);
+                Vector2 a = new Vector2(road[i].x, road[i].z);
+                Vector2 b = new Vector2(road[i + 1].x, road[i + 1].z);
+
+                if (DistancePointToSegment(p, a, b) < radius)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     bool IsTooCloseToOtherVillage(Vector2Int point)
@@ -628,6 +900,7 @@ public class VillageGenerator : MonoBehaviour
         occupiedPositions.Add(pos);
 
         GameObject house = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        house.name = "House";
 
         float height = Random.Range(3f, 6f);
 
@@ -652,7 +925,8 @@ public class VillageGenerator : MonoBehaviour
             while (root.parent != null &&
                   (root.parent.name == "Tree" ||
                    root.parent.name == "Bush" ||
-                   root.parent.name == "Rock"))
+                   root.parent.name == "Rock" ||
+                   root.parent.name == "House"))
             {
                 root = root.parent;
             }
@@ -661,7 +935,8 @@ public class VillageGenerator : MonoBehaviour
 
             if (objectName.Contains("Tree") ||
                 objectName.Contains("Bush") ||
-                objectName.Contains("Rock"))
+                objectName.Contains("Rock") ||
+                objectName.Contains("House"))
             {
                 Destroy(root.gameObject);
             }
