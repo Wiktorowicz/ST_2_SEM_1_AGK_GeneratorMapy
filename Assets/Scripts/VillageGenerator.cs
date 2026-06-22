@@ -6,7 +6,12 @@ public class VillageGenerator : MonoBehaviour
 {
     [SerializeField] private ProceduralTerrainSmooth terrainGenerator;
 
-    [SerializeField] private int villageSize = 30;
+    [Header("Village Size")]
+    [SerializeField] private int minVillageSize = 100;
+    [SerializeField] private int maxVillageSize = 220;
+
+    private int villageSize;
+
     [SerializeField] private float buildingOffset = 6f;
 
     [Header("Village Count")]
@@ -19,7 +24,8 @@ public class VillageGenerator : MonoBehaviour
     [SerializeField] private float maxVillageHeight = 18f;
     [SerializeField] private int flatCheckRadius = 12;
     [SerializeField] private float maxHeightDifference = 2.5f;
-    [SerializeField] private float minDistanceBetweenVillages = 180f;
+    [SerializeField] private float minDistanceBetweenVillages = 220f;
+    [SerializeField] private float minDistanceFromOtherVillageRoads = 90f;
 
     [Header("Buildings")]
     [SerializeField] private float houseBlockRadius = 8f;
@@ -54,7 +60,7 @@ public class VillageGenerator : MonoBehaviour
         int generated = 0;
         int attempts = 0;
 
-        while (generated < villageCount && attempts < villageCount * 20)
+        while (generated < villageCount && attempts < villageCount * 25)
         {
             attempts++;
 
@@ -75,11 +81,14 @@ public class VillageGenerator : MonoBehaviour
         if (IsTooCloseToOtherVillage(startPoint))
             return false;
 
-        villageSize = Random.Range(100, 220);
+        villageSize = Random.Range(minVillageSize, maxVillageSize + 1);
 
         GenerateRoadData(startPoint);
 
         if (roadPoints.Count < 15)
+            return false;
+
+        if (IsTooCloseToExistingRoads(allRoads, minDistanceFromOtherVillageRoads))
             return false;
 
         int possibleHouses = CountPossibleHouseSpots();
@@ -107,6 +116,30 @@ public class VillageGenerator : MonoBehaviour
         {
             if (Vector2Int.Distance(center, point) < minDistanceBetweenVillages)
                 return true;
+        }
+
+        return false;
+    }
+
+    bool IsTooCloseToExistingRoads(List<List<Vector3>> roadsToCheck, float radius)
+    {
+        foreach (var newRoad in roadsToCheck)
+        {
+            foreach (var point in newRoad)
+            {
+                foreach (var oldRoad in globalRoads)
+                {
+                    for (int i = 0; i < oldRoad.Count - 1; i++)
+                    {
+                        Vector2 p = new Vector2(point.x, point.z);
+                        Vector2 a = new Vector2(oldRoad[i].x, oldRoad[i].z);
+                        Vector2 b = new Vector2(oldRoad[i + 1].x, oldRoad[i + 1].z);
+
+                        if (DistancePointToSegment(p, a, b) < radius)
+                            return true;
+                    }
+                }
+            }
         }
 
         return false;
