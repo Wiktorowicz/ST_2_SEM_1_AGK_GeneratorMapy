@@ -15,15 +15,15 @@ public class VillageGenerator : MonoBehaviour
 
     [Header("Village Placement")]
     [SerializeField] private float minVillageHeightAboveWater = 2.4f;
-    [SerializeField] private float minRoadHeightAboveWater = 1.8f;
+    [SerializeField] private float minRoadHeightAboveWater = 1.4f;
     [SerializeField] private float maxVillageHeight = 18f;
     [SerializeField] private int flatCheckRadius = 12;
     [SerializeField] private float maxHeightDifference = 2.5f;
     [SerializeField] private float minDistanceBetweenVillages = 180f;
 
     [Header("Buildings")]
-    [SerializeField] private float houseBlockRadius = 9f;
-    [SerializeField] private float minDistanceFromRoad = 10f;
+    [SerializeField] private float houseBlockRadius = 8f;
+    [SerializeField] private float minDistanceFromRoad = 7f;
     [SerializeField] private float clearTreesRadius = 7f;
 
     [Header("Road")]
@@ -54,7 +54,7 @@ public class VillageGenerator : MonoBehaviour
         int generated = 0;
         int attempts = 0;
 
-        while (generated < villageCount && attempts < villageCount * 10)
+        while (generated < villageCount && attempts < villageCount * 15)
         {
             attempts++;
 
@@ -72,17 +72,23 @@ public class VillageGenerator : MonoBehaviour
         if (IsTooCloseToOtherVillage(startPoint))
             return false;
 
-        villageCenters.Add(startPoint);
-
         villageSize = Random.Range(100, 220);
 
-        terrainGenerator.FlattenArea(startPoint.x, startPoint.y, 35);
-
-        GenerateRoad(startPoint);
+        GenerateRoadData(startPoint);
 
         if (roadPoints.Count < 15)
             return false;
 
+        int possibleHouses = CountPossibleHouseSpots();
+
+        if (possibleHouses < 6)
+            return false;
+
+        villageCenters.Add(startPoint);
+
+        terrainGenerator.FlattenArea(startPoint.x, startPoint.y, 35);
+
+        CreateAllRoadMeshes();
         GenerateBuildings();
         GenerateDecorations();
 
@@ -203,7 +209,7 @@ public class VillageGenerator : MonoBehaviour
         return true;
     }
 
-    void GenerateRoad(Vector2Int start)
+    void GenerateRoadData(Vector2Int start)
     {
         roadPoints.Clear();
         allRoads.Clear();
@@ -232,10 +238,7 @@ public class VillageGenerator : MonoBehaviour
         }
 
         if (roadPoints.Count > 2)
-        {
             allRoads.Add(new List<Vector3>(roadPoints));
-            CreateRoadMesh(roadPoints);
-        }
 
         int lastSideRoadIndex = -999;
 
@@ -255,7 +258,7 @@ public class VillageGenerator : MonoBehaviour
 
             Vector3 dir = (b - a).normalized;
 
-            if (GenerateSideRoad(a, dir))
+            if (GenerateSideRoadData(a, dir))
             {
                 intersections.Add(a);
                 lastSideRoadIndex = i;
@@ -263,7 +266,7 @@ public class VillageGenerator : MonoBehaviour
         }
     }
 
-    bool GenerateSideRoad(Vector3 startPoint, Vector3 mainDir)
+    bool GenerateSideRoadData(Vector3 startPoint, Vector3 mainDir)
     {
         List<Vector3> sidePoints = new List<Vector3>();
 
@@ -299,11 +302,69 @@ public class VillageGenerator : MonoBehaviour
         if (sidePoints.Count >= minSideRoadLength)
         {
             allRoads.Add(sidePoints);
-            CreateRoadMesh(sidePoints);
             return true;
         }
 
         return false;
+    }
+
+    int CountPossibleHouseSpots()
+    {
+        int count = 0;
+
+        foreach (var road in allRoads)
+        {
+            for (int i = 1; i < road.Count - 1; i++)
+            {
+                if (i % 3 != 0)
+                    continue;
+
+                Vector3 point = road[i];
+
+                if (IsNearIntersection(point, 12f))
+                    continue;
+
+                Vector3 dir = (road[i + 1] - road[i - 1]).normalized;
+                Vector3 side = Vector3.Cross(Vector3.up, dir).normalized;
+
+                Vector3 left = point + side * buildingOffset;
+                Vector3 right = point - side * buildingOffset;
+
+                left.y = terrainGenerator.GetHeightWorld(left.x, left.z);
+                right.y = terrainGenerator.GetHeightWorld(right.x, right.z);
+
+                if (CanPlaceHousePreview(left))
+                    count++;
+
+                if (CanPlaceHousePreview(right))
+                    count++;
+            }
+        }
+
+        return count;
+    }
+
+    bool CanPlaceHousePreview(Vector3 pos)
+    {
+        float h = terrainGenerator.GetHeightWorld(pos.x, pos.z);
+        float water = terrainGenerator.GetWaterLevel();
+
+        if (h < water + minRoadHeightAboveWater)
+            return false;
+
+        if (h > maxVillageHeight)
+            return false;
+
+        if (IsNearAnyRoad(pos, minDistanceFromRoad))
+            return false;
+
+        return true;
+    }
+
+    void CreateAllRoadMeshes()
+    {
+        foreach (var road in allRoads)
+            CreateRoadMesh(road);
     }
 
     void CreateRoadMesh(List<Vector3> points)
@@ -426,7 +487,7 @@ public class VillageGenerator : MonoBehaviour
         if (IsNearAnyRoad(pos, minDistanceFromRoad))
             return false;
 
-        if (Random.value <= 0.25f)
+        if (Random.value <= 0.05f)
             return false;
 
         return true;
