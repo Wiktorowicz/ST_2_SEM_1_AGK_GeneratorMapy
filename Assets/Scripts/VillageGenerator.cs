@@ -28,8 +28,8 @@ public class VillageGenerator : MonoBehaviour
 
     [Header("Road")]
     [SerializeField] private Material roadMaterial;
-    [SerializeField] private float roadWidth = 6f;
-    [SerializeField] private float roadHeightOffset = 0.15f;
+    [SerializeField] private float roadWidth = 12f;
+    [SerializeField] private float roadHeightOffset = 0.5f;
     [SerializeField] private float clearRoadObjectsRadius = 7f;
 
     [Header("Side Roads")]
