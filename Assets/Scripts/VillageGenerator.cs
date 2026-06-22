@@ -9,16 +9,21 @@ public class VillageGenerator : MonoBehaviour
     [SerializeField] private int villageSize = 30;
     [SerializeField] private float buildingOffset = 6f;
 
+    [Header("Village Count")]
+    [SerializeField] private int minVillageCount = 2;
+    [SerializeField] private int maxVillageCount = 5;
+
     [Header("Village Placement")]
     [SerializeField] private float minVillageHeightAboveWater = 2.4f;
     [SerializeField] private float minRoadHeightAboveWater = 1.8f;
     [SerializeField] private float maxVillageHeight = 18f;
     [SerializeField] private int flatCheckRadius = 12;
     [SerializeField] private float maxHeightDifference = 2.5f;
+    [SerializeField] private float minDistanceBetweenVillages = 180f;
 
     [Header("Buildings")]
-    [SerializeField] private float houseBlockRadius = 8f;
-    [SerializeField] private float minDistanceFromRoad = 5f;
+    [SerializeField] private float houseBlockRadius = 9f;
+    [SerializeField] private float minDistanceFromRoad = 10f;
     [SerializeField] private float clearTreesRadius = 7f;
 
     [Header("Road")]
@@ -28,12 +33,13 @@ public class VillageGenerator : MonoBehaviour
     [SerializeField] private float clearRoadObjectsRadius = 7f;
 
     [Header("Side Roads")]
-    [SerializeField] private int sideRoadSpacing = 28;
+    [SerializeField] private int sideRoadSpacing = 45;
     [SerializeField] private int minSideRoadLength = 20;
-    [SerializeField] private float sideRoadChance = 0.55f;
+    [SerializeField] private float sideRoadChance = 0.45f;
 
     private List<Vector3> roadPoints = new List<Vector3>();
     private List<List<Vector3>> allRoads = new List<List<Vector3>>();
+    private List<List<Vector3>> globalRoads = new List<List<Vector3>>();
     private List<Vector3> intersections = new List<Vector3>();
 
     private List<Vector2Int> villageCenters = new List<Vector2Int>();
@@ -43,25 +49,28 @@ public class VillageGenerator : MonoBehaviour
     {
         yield return new WaitForSeconds(0.5f);
 
-        int villageCount = Random.Range(2, 6);
+        int villageCount = Random.Range(minVillageCount, maxVillageCount + 1);
 
-        for (int i = 0; i < villageCount; i++)
+        int generated = 0;
+        int attempts = 0;
+
+        while (generated < villageCount && attempts < villageCount * 10)
         {
-            GenerateVillage();
+            attempts++;
+
+            if (GenerateVillage())
+                generated++;
         }
     }
 
-    void GenerateVillage()
+    bool GenerateVillage()
     {
         occupiedPositions.Clear();
 
         Vector2Int startPoint = FindFlatArea();
 
-        foreach (var center in villageCenters)
-        {
-            if (Vector2Int.Distance(center, startPoint) < 50f)
-                return;
-        }
+        if (IsTooCloseToOtherVillage(startPoint))
+            return false;
 
         villageCenters.Add(startPoint);
 
@@ -70,21 +79,46 @@ public class VillageGenerator : MonoBehaviour
         terrainGenerator.FlattenArea(startPoint.x, startPoint.y, 35);
 
         GenerateRoad(startPoint);
+
+        if (roadPoints.Count < 15)
+            return false;
+
         GenerateBuildings();
         GenerateDecorations();
+
+        foreach (var road in allRoads)
+            globalRoads.Add(new List<Vector3>(road));
+
+        return true;
+    }
+
+    bool IsTooCloseToOtherVillage(Vector2Int point)
+    {
+        foreach (var center in villageCenters)
+        {
+            if (Vector2Int.Distance(center, point) < minDistanceBetweenVillages)
+                return true;
+        }
+
+        return false;
     }
 
     Vector2Int FindFlatArea()
     {
         List<Vector2Int> validPoints = new List<Vector2Int>();
 
-        for (int i = 0; i < 4000; i++)
+        for (int i = 0; i < 5000; i++)
         {
             int x = Random.Range(20, terrainGenerator.GetWidth() - 20);
             int z = Random.Range(20, terrainGenerator.GetDepth() - 20);
 
+            Vector2Int p = new Vector2Int(x, z);
+
+            if (IsTooCloseToOtherVillage(p))
+                continue;
+
             if (IsGoodVillageArea(x, z))
-                validPoints.Add(new Vector2Int(x, z));
+                validPoints.Add(p);
         }
 
         if (validPoints.Count > 0)
@@ -351,7 +385,7 @@ public class VillageGenerator : MonoBehaviour
 
                 Vector3 point = road[i];
 
-                if (IsNearIntersection(point, 10f))
+                if (IsNearIntersection(point, 12f))
                     continue;
 
                 Vector3 dir = (road[i + 1] - road[i - 1]).normalized;
@@ -413,14 +447,50 @@ public class VillageGenerator : MonoBehaviour
     {
         foreach (var road in allRoads)
         {
-            foreach (var p in road)
+            for (int i = 0; i < road.Count - 1; i++)
             {
-                if (Vector3.Distance(pos, p) < radius)
+                Vector2 p = new Vector2(pos.x, pos.z);
+                Vector2 a = new Vector2(road[i].x, road[i].z);
+                Vector2 b = new Vector2(road[i + 1].x, road[i + 1].z);
+
+                float distance = DistancePointToSegment(p, a, b);
+
+                if (distance < radius + roadWidth * 0.5f)
+                    return true;
+            }
+        }
+
+        foreach (var road in globalRoads)
+        {
+            for (int i = 0; i < road.Count - 1; i++)
+            {
+                Vector2 p = new Vector2(pos.x, pos.z);
+                Vector2 a = new Vector2(road[i].x, road[i].z);
+                Vector2 b = new Vector2(road[i + 1].x, road[i + 1].z);
+
+                float distance = DistancePointToSegment(p, a, b);
+
+                if (distance < radius + roadWidth * 0.5f)
                     return true;
             }
         }
 
         return false;
+    }
+
+    float DistancePointToSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        Vector2 ab = b - a;
+
+        if (ab.sqrMagnitude <= 0.001f)
+            return Vector2.Distance(p, a);
+
+        float t = Vector2.Dot(p - a, ab) / ab.sqrMagnitude;
+        t = Mathf.Clamp01(t);
+
+        Vector2 closest = a + ab * t;
+
+        return Vector2.Distance(p, closest);
     }
 
     bool IsAreaFree(Vector3 pos, float radius)
