@@ -182,12 +182,12 @@ public class VillageGenerator : MonoBehaviour
 
         allRoads.Add(new List<Vector3>(roadPoints));
 
+        CreateRoadMesh(roadPoints);
+
         for (int i = 0; i < roadPoints.Count - 1; i++)
         {
             Vector3 a = roadPoints[i];
             Vector3 b = roadPoints[i + 1];
-
-            CreateRoadSegment(a, b);
 
             if (i % 8 == 0 && Random.value > 0.5f)
             {
@@ -239,46 +239,65 @@ public class VillageGenerator : MonoBehaviour
         if (sidePoints.Count > 2)
             allRoads.Add(sidePoints);
 
-        for (int i = 0; i < sidePoints.Count - 1; i++)
-            CreateRoadSegment(sidePoints[i], sidePoints[i + 1]);
+        CreateRoadMesh(sidePoints);
     }
 
-    void CreateRoadSegment(Vector3 a, Vector3 b)
+    void CreateRoadMesh(List<Vector3> points)
     {
-        Vector3 center = (a + b) * 0.5f;
-
-        ClearObjectsAround(center, clearRoadObjectsRadius);
-
-        if (!IsAreaFree(center, roadWidth))
+        if (points.Count < 2)
             return;
 
-        occupiedPositions.Add(center);
+        List<Vector3> vertices = new List<Vector3>();
+        List<int> triangles = new List<int>();
 
-        Vector3 dir = (b - a).normalized;
-        Vector3 side = Vector3.Cross(Vector3.up, dir) * (roadWidth / 2f);
+        for (int i = 0; i < points.Count; i++)
+        {
+            Vector3 dir;
 
-        Vector3 p1 = a + side;
-        Vector3 p2 = a - side;
-        Vector3 p3 = b + side;
-        Vector3 p4 = b - side;
+            if (i == 0)
+                dir = (points[i + 1] - points[i]).normalized;
+            else if (i == points.Count - 1)
+                dir = (points[i] - points[i - 1]).normalized;
+            else
+                dir = (points[i + 1] - points[i - 1]).normalized;
 
-        p1.y = terrainGenerator.GetHeightWorld(p1.x, p1.z) + 0.1f;
-        p2.y = terrainGenerator.GetHeightWorld(p2.x, p2.z) + 0.1f;
-        p3.y = terrainGenerator.GetHeightWorld(p3.x, p3.z) + 0.1f;
-        p4.y = terrainGenerator.GetHeightWorld(p4.x, p4.z) + 0.1f;
+            Vector3 side = Vector3.Cross(Vector3.up, dir).normalized * (roadWidth / 2f);
 
-        GameObject segment = new GameObject("RoadSegment");
+            Vector3 left = points[i] + side;
+            Vector3 right = points[i] - side;
+
+            left.y = terrainGenerator.GetHeightWorld(left.x, left.z) + 0.1f;
+            right.y = terrainGenerator.GetHeightWorld(right.x, right.z) + 0.1f;
+
+            vertices.Add(left);
+            vertices.Add(right);
+
+            ClearObjectsAround(points[i], clearRoadObjectsRadius);
+            occupiedPositions.Add(points[i]);
+        }
+
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            int index = i * 2;
+
+            triangles.Add(index);
+            triangles.Add(index + 1);
+            triangles.Add(index + 2);
+
+            triangles.Add(index + 2);
+            triangles.Add(index + 1);
+            triangles.Add(index + 3);
+        }
+
+        GameObject road = new GameObject("RoadMesh");
 
         Mesh mesh = new Mesh();
-        mesh.vertices = new Vector3[] { p1, p2, p3, p4 };
-        mesh.triangles = new int[] {
-            0, 1, 2,
-            2, 1, 3
-        };
+        mesh.vertices = vertices.ToArray();
+        mesh.triangles = triangles.ToArray();
         mesh.RecalculateNormals();
 
-        MeshFilter mf = segment.AddComponent<MeshFilter>();
-        MeshRenderer mr = segment.AddComponent<MeshRenderer>();
+        MeshFilter mf = road.AddComponent<MeshFilter>();
+        MeshRenderer mr = road.AddComponent<MeshRenderer>();
 
         mf.mesh = mesh;
 
